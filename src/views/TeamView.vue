@@ -72,7 +72,7 @@ const handleSubmit = async () => {
   try {
     if (isEditingMode.value) {
       // EDITAR (PUT)
-      const response = await fetch(`http://localhost:3000/api/update-user/${currentUserId.value}`, {
+      const response = await fetch(`/api/update-user/${currentUserId.value}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser.value)
@@ -83,7 +83,7 @@ const handleSubmit = async () => {
       
     } else {
       // CREAR (POST)
-      const response = await fetch('http://localhost:3000/api/create-user', {
+      const response = await fetch('/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser.value)
@@ -110,14 +110,14 @@ const deleteEmployee = async (emp: any) => {
   
   if(!confirm(`¿Dar de baja a ${emp.full_name}? \n\nSu historial se mantendrá, pero no podrá acceder.`)) return
   
-  await fetch(`http://localhost:3000/api/delete-user/${emp.id}`, { method: 'DELETE' })
+  await fetch(`/api/delete-user/${emp.id}`, { method: 'DELETE' })
   fetchTeam()
 }
 
 // Función RESTAURAR
 const restoreEmployee = async (id: string) => {
   if(!confirm('¿Reactivar a este empleado? Podrá volver a entrar.')) return
-  await fetch(`http://localhost:3000/api/restore-user/${id}`, { method: 'PUT' })
+  await fetch(`/api/restore-user/${id}`, { method: 'PUT' })
   fetchTeam()
 }
 
