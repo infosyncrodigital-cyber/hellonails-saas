@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { supabase } from '../supabase/client'
 
-const props = defineProps<{ isOpen: boolean }>()
+defineProps<{ isOpen: boolean }>()
 const emit = defineEmits(['close', 'saved'])
 
 const appointments = ref<any[]>([])

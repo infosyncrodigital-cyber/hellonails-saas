@@ -83,7 +83,7 @@ const router = createRouter({
 })
 
 // GUARDIA DE NAVEGACIÓN (El Segurata)
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const { data: { session } } = await supabase.auth.getSession()
   const userRole = localStorage.getItem('userRole')
 
