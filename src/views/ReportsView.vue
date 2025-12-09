@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { supabase } from '../supabase/client'
 
 // Fechas por defecto: El mes actual
@@ -10,6 +10,15 @@ const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOStri
 const startDate = ref(firstDay)
 const endDate = ref(lastDay)
 const loading = ref(false)
+
+const employees = ref<any[]>([]) // Lista para el select
+const selectedEmployee = ref('all') // Modelo del select
+
+// Cargar empleados al inicio
+onMounted(async () => {
+  const { data } = await supabase.from('profiles').select('id, full_name').order('full_name')
+  employees.value = data || []
+})
 
 // --- UTILIDAD: CONVERTIR A CSV (VERSIÓN COMPATIBLE EXCEL ESPAÑA) ---
 const downloadCSV = (data: any[], filename: string) => {
@@ -88,16 +97,22 @@ const exportSales = async () => {
 const exportTimeTracking = async () => {
   loading.value = true
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('time_entries')
     .select(`
-      clock_in,
-      clock_out,
+      clock_in, clock_out, entry_type, 
       profiles (full_name, email)
-    `)
+    `) // <--- Añado entry_type para que salga si es pausa o trabajo en el excel
     .gte('clock_in', new Date(startDate.value).toISOString())
     .lt('clock_in', new Date(endDate.value + 'T23:59:59').toISOString())
     .order('clock_in', { ascending: true })
+
+    // APLICAR FILTRO SI NO ES 'ALL'
+  if (selectedEmployee.value !== 'all') {
+    query = query.eq('employee_id', selectedEmployee.value)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     alert('Error: ' + error.message)
@@ -115,6 +130,7 @@ const exportTimeTracking = async () => {
 
     return {
       Empleado: item.profiles?.full_name,
+      Tipo: item.entry_type === 'work' ? 'Trabajo' : (item.entry_type === 'lunch' ? 'Comida' : 'Pausa'),
       Email: item.profiles?.email,
       Fecha: new Date(item.clock_in).toLocaleDateString(),
       Entrada: new Date(item.clock_in).toLocaleTimeString(),
@@ -137,15 +153,25 @@ const exportTimeTracking = async () => {
     </div>
 
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
-      <h3 class="font-bold text-gray-700 mb-4">Selecciona Rango de Fechas</h3>
+      <h3 class="font-bold text-gray-700 mb-4">Configuración del Reporte</h3>
+      
       <div class="flex flex-wrap gap-4 items-end">
         <div>
           <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Desde</label>
-          <input v-model="startDate" type="date" class="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-primary">
+          <input v-model="startDate" type="date" class="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-primary h-[42px]">
         </div>
+
         <div>
           <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Hasta</label>
-          <input v-model="endDate" type="date" class="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-primary">
+          <input v-model="endDate" type="date" class="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-primary h-[42px]">
+        </div>
+
+        <div class="min-w-[200px]">
+           <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Filtrar Empleado</label>
+           <select v-model="selectedEmployee" class="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-primary bg-white h-[42px]">
+             <option value="all">Todos los empleados</option>
+             <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.full_name }}</option>
+           </select>
         </div>
       </div>
     </div>
@@ -175,7 +201,7 @@ const exportTimeTracking = async () => {
         >
           <span v-if="loading" class="text-sm animate-pulse">Procesando...</span>
           <span v-else class="flex items-center gap-2 font-medium text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
               <path fill-rule="evenodd" d="M12 2.25a.75.75 0 0 1 .75.75v11.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-4.5 4.5a.75.75 0 0 1-1.06 0l-4.5-4.5a.75.75 0 1 1 1.06-1.06l3.22 3.22V3a.75.75 0 0 1 .75-.75Zm-9 13.5a.75.75 0 0 1 .75.75v2.25a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5V16.5a.75.75 0 0 1 1.5 0v2.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V16.5a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd" />
             </svg>
             Descargar Excel (CSV)
@@ -203,7 +229,7 @@ const exportTimeTracking = async () => {
         >
           <span v-if="loading" class="text-sm animate-pulse">Procesando...</span>
           <span v-else class="flex items-center gap-2 font-medium text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
               <path fill-rule="evenodd" d="M12 2.25a.75.75 0 0 1 .75.75v11.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-4.5 4.5a.75.75 0 0 1-1.06 0l-4.5-4.5a.75.75 0 1 1 1.06-1.06l3.22 3.22V3a.75.75 0 0 1 .75-.75Zm-9 13.5a.75.75 0 0 1 .75.75v2.25a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5V16.5a.75.75 0 0 1 1.5 0v2.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V16.5a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd" />
             </svg>
             Descargar Excel (CSV)

@@ -144,37 +144,79 @@ const sendWhatsApp = () => {
 }
 
 const save = async () => {
+  // 1. Validaciones básicas de formulario
   if (!form.value.employee_id || !form.value.date) return alert('Faltan datos básicos')
-  
   if (eventType.value === 'appointment') {
     if (!form.value.customer_id || !form.value.service_id) return alert('Selecciona Cliente y Servicio')
   }
 
   loading.value = true
+  const startTime = new Date(form.value.date)
   
-  // --- VALIDACIÓN HORARIA ---
-  const dateObj = new Date(form.value.date)
-  const dayOfWeek = dateObj.getDay()
-  const dayConfig = businessHours.value.find(d => d.day_of_week === dayOfWeek)
+  // --- A. VALIDACIÓN 1: HORARIO DE TIENDA (GLOBAL) ---
+  const dayOfWeek = startTime.getDay() // 0-6
+  const shopDay = businessHours.value.find(d => d.day_of_week === dayOfWeek)
+  const timeStr = form.value.date.split('T')[1]?.slice(0, 5) || '00:00'
 
-  if (dayConfig) {
-    if (dayConfig.is_closed) {
+  if (shopDay) {
+    if (shopDay.is_closed) {
       loading.value = false
-      return alert('⛔ La tienda está CERRADA este día.')
+      return alert('⛔ La TIENDA está cerrada este día.')
     }
-    
-    const selectedTime = form.value.date.split('T')[1]?.slice(0, 5) || '00:00'
-    const openTime = dayConfig.open_time.slice(0, 5)
-    const closeTime = dayConfig.close_time.slice(0, 5)
-
-    if (selectedTime < openTime || selectedTime >= closeTime) {
+    if (timeStr < shopDay.open_time.slice(0,5) || timeStr >= shopDay.close_time.slice(0,5)) {
       loading.value = false
-      return alert(`⛔ Horario no válido. Abrimos de ${openTime} a ${closeTime}.`)
+      return alert(`⛔ La tienda abre de ${shopDay.open_time} a ${shopDay.close_time}.`)
     }
   }
 
-  // --- VALIDACIÓN SOLAPAMIENTO ---
-  const startTime = new Date(form.value.date)
+  // --- B. VALIDACIÓN 2: VACACIONES (Nuevo) ---
+  // Buscamos si el empleado tiene vacaciones APROBADAS que coincidan con la fecha
+  const dateOnly = form.value.date.split('T')[0] // YYYY-MM-DD
+  const { data: vacations } = await supabase
+    .from('time_off_requests')
+    .select('*')
+    .eq('employee_id', form.value.employee_id)
+    .eq('status', 'approved') // Solo si están aprobadas
+    .lte('start_date', dateOnly) // Empiezan antes o hoy
+    .gte('end_date', dateOnly)   // Terminan hoy o después
+
+  if (vacations && vacations.length > 0) {
+    loading.value = false
+    return alert(`⛔ Imposible: El empleado está de VACACIONES (${vacations[0].type}).`)
+  }
+
+  // --- C. VALIDACIÓN 3: TURNO DEL EMPLEADO (Soporte Turno Partido) ---
+  const { data: shifts } = await supabase
+    .from('employee_shifts')
+    .select('*')
+    .eq('employee_id', form.value.employee_id)
+    .eq('day_of_week', dayOfWeek)
+  
+  if (!shifts || shifts.length === 0) {
+    loading.value = false
+    return alert('⛔ Este empleado NO tiene turno este día.')
+  } else {
+    const shift = shifts[0]
+    
+    // Comprobamos Turno 1
+    const inShift1 = timeStr >= shift.start_time.slice(0,5) && timeStr < shift.end_time.slice(0,5)
+    
+    // Comprobamos Turno 2 (si existe)
+    let inShift2 = false
+    if (shift.start_time_2 && shift.end_time_2) {
+      inShift2 = timeStr >= shift.start_time_2.slice(0,5) && timeStr < shift.end_time_2.slice(0,5)
+    }
+
+    // Si NO está ni en el 1 ni en el 2, error
+    if (!inShift1 && !inShift2) {
+      loading.value = false
+      let msg = `⛔ Fuera de turno. Horario: ${shift.start_time}-${shift.end_time}`
+      if (shift.start_time_2) msg += ` y ${shift.start_time_2}-${shift.end_time_2}`
+      return alert(msg)
+    }
+  }
+
+  // --- D. VALIDACIÓN 4: CHOQUE CON OTRAS CITAS (Lo que ya tenías) ---
   let duration = form.value.duration || 60
   if (eventType.value === 'appointment') {
     const s = services.value.find(x => x.id === form.value.service_id)
@@ -201,15 +243,15 @@ const save = async () => {
 
   if (hasClash) {
     loading.value = false
-    return alert('⚠️ Este empleado ya está ocupado en ese horario.')
+    return alert('⚠️ HUECO OCUPADO: Este empleado ya tiene una cita a esa hora.')
   }
 
-  // --- GUARDADO ---
+  // --- E. GUARDADO FINAL ---
   const payload: any = {
     employee_id: form.value.employee_id,
     date: startTime.toISOString(),
     notes: form.value.notes,
-    photos: form.value.photos, // Guardamos array de fotos
+    photos: form.value.photos,
     status: eventType.value === 'block' ? 'blocked' : form.value.status
   }
 

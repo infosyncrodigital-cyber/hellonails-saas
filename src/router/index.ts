@@ -13,6 +13,7 @@ import SettingsView from '../views/SettingsView.vue'
 import TimeTrackerView from '../views/TimeTrackerView.vue'
 import AdminTimeView from '../views/AdminTimeView.vue'
 import ReportsView from '../views/ReportsView.vue'
+import TimeOffView from '../views/TimeOffView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -76,6 +77,12 @@ const router = createRouter({
           name: 'reports',
           component: ReportsView,
           meta: {requiresAuth: true, requiresAdmin: true}
+        },
+        {
+          path: 'vacaciones',
+          name: 'vacaciones',
+          component: TimeOffView,
+          meta: { requiresAuth: true }
         }
       ]
     }
