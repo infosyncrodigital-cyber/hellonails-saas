@@ -21,37 +21,38 @@ const supabaseAdmin = createClient(
 
 // RUTA: Crear Usuario
 app.post('/api/create-user', async (req, res) => {
-  const { email, password, name, role } = req.body;
+  // 1. Recibimos el phone del frontend
+  const { email, password, name, role, color, phone } = req.body;
 
-  console.log(`👤 Creando usuario: ${email} (${role})`);
+  console.log(`👤 Creando: ${email} - Tel: ${phone}`);
 
   try {
-    // 1. Crear el usuario en el sistema de Autenticación
+    // 2. Crear en Auth (Esto dispara el Trigger de Supabase)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
-      email_confirm: true // Lo confirmamos automáticamente para que pueda entrar ya
+      email_confirm: true,
+      user_metadata: { full_name: name, role, phone } // Pasamos datos extra por si acaso
     });
 
     if (authError) throw authError;
 
-    // 2. Crear la ficha en la tabla pública 'profiles'
+    // 3. UPSERT en profiles (La clave del éxito)
+    // "Si el ID existe (creado por trigger), actualiza. Si no, crea."
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert([
-        {
-          id: authData.user.id, // Usamos el mismo ID
-          email: email,
-          full_name: name,
-          role: role, // 'admin' o 'employee'
-          color: req.body.color || '#3B82F6'
-        }
-      ]);
+      .upsert({
+        id: authData.user.id, // Usamos el mismo ID
+        email: email,
+        full_name: name,
+        phone: phone, // <--- Guardamos el teléfono
+        role: role,
+        color: color || '#3B82F6'
+      });
 
     if (profileError) throw profileError;
 
-    console.log('✅ Usuario creado con éxito');
-    res.status(200).json({ message: 'Usuario creado correctamente', user: authData.user });
+    res.status(200).json({ message: 'Creado correctamente', user: authData.user });
 
   } catch (error) {
     console.error('❌ Error:', error.message);
@@ -95,12 +96,17 @@ app.delete('/api/delete-user/:id', async (req, res) => {
 // Pero cambiar nombre/color sí lo hacemos fácil.
 app.put('/api/update-user/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, role, color } = req.body;
+  const { name, role, color, phone } = req.body; // <--- Recibimos phone
 
   try {
     const { error } = await supabaseAdmin
       .from('profiles')
-      .update({ full_name: name, role, color })
+      .update({ 
+        full_name: name, 
+        role, 
+        color,
+        phone // <--- Actualizamos phone
+      })
       .eq('id', id);
 
     if (error) throw error;

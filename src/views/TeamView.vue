@@ -6,7 +6,7 @@ const employees = ref<any[]>([])
 const loading = ref(true)
 const showModal = ref(false)
 const showInactive = ref(false)
-const newUser = ref({ email: '', password: '', name: '', role: 'employee', color: '#3B82F6' })
+const newUser = ref({ email: '', password: '', name: '', phone: '', role: 'employee', color: '#3B82F6' })
 const isCreating = ref(false)
 const isEditingMode = ref(false) 
 const currentUserId = ref('')
@@ -39,6 +39,7 @@ const openCreate = () => {
     email: '', 
     password: '', 
     name: '', 
+    phone: '',
     role: 'employee', 
     color: '#3B82F6' 
   }
@@ -54,6 +55,7 @@ const openEdit = (emp: any) => {
     email: emp.email,
     password: '', // La contraseña se deja vacía (solo se envía si se quiere cambiar)
     name: emp.full_name,
+    phone: emp.phone,
     role: emp.role,
     color: emp.color || '#3B82F6'
   }
@@ -164,6 +166,7 @@ onMounted(() => {
             <span v-if="!emp.is_active" class="text-[10px] uppercase bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-bold">Baja</span>
           </h3>
           <p class="text-sm text-gray-500 truncate">{{ emp.email }}</p>
+          <p class="text-sm text-gray-500 truncate">{{ emp.phone }}</p>
           
           <span 
             v-if="emp.is_active"
@@ -208,6 +211,15 @@ onMounted(() => {
           <div>
             <label class="text-sm font-medium text-gray-700">Nombre</label>
             <input v-model="newUser.name" type="text" class="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary">
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-700">Teléfono (WhatsApp)</label>
+            <input 
+              v-model="newUser.phone" 
+              type="tel" 
+              placeholder="Ej: 666111222"
+              class="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary"
+            >
           </div>
           <div>
             <label class="text-sm font-medium text-gray-700">Email</label>
